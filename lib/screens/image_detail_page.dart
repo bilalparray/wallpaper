@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart'; // For Material/SnackBar
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:gallery_saver_plus/gallery_saver.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wallpaper_manager_plus/wallpaper_manager_plus.dart';
 import 'package:wallpaper/models/wallpaper.dart';
@@ -31,12 +30,12 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
   Future<void> _showMessage(String msg) async {
     await showCupertinoDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text('Notice'),
+      builder: (_) => CupertinoAlertDialog(
+        title: const Text('Notice'),
         content: Text(msg),
         actions: [
           CupertinoDialogAction(
-            child: Text('OK'),
+            child: const Text('OK'),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -48,10 +47,14 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
     setState(() => _isProcessing = true);
     await _ensurePermissions();
     try {
-      final success = await GallerySaver.saveImage(widget.wallpaper.url);
-      _showMessage(success == true ? 'Downloaded to Gallery' : 'Save failed');
+      final success = await GallerySaver.saveImage(
+        widget.wallpaper.url,
+        albumName: 'Wallpapers',
+      );
+      await _showMessage(
+          success == true ? 'Downloaded to Gallery' : 'Save failed');
     } catch (e) {
-      _showMessage('Download failed: $e');
+      await _showMessage('Download failed: $e');
     } finally {
       setState(() => _isProcessing = false);
     }
@@ -60,12 +63,14 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
   Future<void> _shareImage() async {
     setState(() => _isProcessing = true);
     try {
-      final tmpDir = await Directory.systemTemp.createTemp();
-      final params = ShareParams(
-          text: 'Great picture', files: [XFile('${tmpDir.path}/share.jpg')]);
-      await SharePlus.instance.share(params);
+      // Download to temp file
+      final file =
+          await DefaultCacheManager().getSingleFile(widget.wallpaper.url);
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'Great picture!');
     } catch (e) {
-      _showMessage('Share failed: $e');
+      await _showMessage('Share failed: $e');
     } finally {
       setState(() => _isProcessing = false);
     }
@@ -76,18 +81,10 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
     setState(() => _isProcessing = true);
     await _ensurePermissions();
     try {
-      // Get the file from the cache manager
       final file =
           await DefaultCacheManager().getSingleFile(widget.wallpaper.url);
-
-      // Check if the file exists
       if (await file.exists()) {
-        // Set the wallpaper using the file path
-        final result = await wallpaperMgr.setWallpaper(
-          file, // This should be a String path
-          WallpaperManagerPlus.homeScreen,
-        );
-        await _showMessage(result ?? 'Wallpaper set successfully!');
+        _showWallpaperOptions(file);
       } else {
         await _showMessage('File does not exist.');
       }
@@ -98,53 +95,102 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
     }
   }
 
+  void _showWallpaperOptions(File file) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: const Text('Set Wallpaper'),
+        message: const Text('Choose where to set the wallpaper:'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('Home Screen'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _setWallpaper(file, WallpaperManagerPlus.homeScreen);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('Lock Screen'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _setWallpaper(file, WallpaperManagerPlus.lockScreen);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('Both'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _setWallpaper(file, WallpaperManagerPlus.bothScreens);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('Cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setWallpaper(File file, int wallpaperType) async {
+    try {
+      await wallpaperMgr.setWallpaper(
+        file,
+        wallpaperType,
+      );
+      await _showMessage('Wallpaper set successfully!');
+    } catch (e) {
+      await _showMessage('Failed to set wallpaper');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      child: CupertinoPageScaffold(
-        navigationBar:
-            CupertinoNavigationBar(middle: const Text('Wallpaper Detail')),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Image.network(
-                  widget.wallpaper.url,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const Center(child: Icon(CupertinoIcons.xmark)),
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('Wallpaper Detail'),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Image.network(
+                widget.wallpaper.url,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(CupertinoIcons.xmark),
                 ),
               ),
-              if (_isProcessing)
-                const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CupertinoActivityIndicator()),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      CupertinoButton(
-                        onPressed: _isProcessing ? null : _downloadImage,
-                        child: const Text('Download'),
-                      ),
-                      CupertinoButton(
-                        onPressed: _isProcessing ? null : _shareImage,
-                        child: const Text('Share'),
-                      ),
-                      CupertinoButton(
-                        onPressed: _isProcessing ? null : _setAsWallpaper,
-                        child: const Text('Set as wallpaper'),
-                      ),
-                    ],
-                  ),
+            ),
+            if (_isProcessing)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: CupertinoActivityIndicator(),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    CupertinoButton(
+                      onPressed: _isProcessing ? null : _downloadImage,
+                      child: const Text('Download'),
+                    ),
+                    CupertinoButton(
+                      onPressed: _isProcessing ? null : _shareImage,
+                      child: const Text('Share'),
+                    ),
+                    CupertinoButton(
+                      onPressed: _isProcessing ? null : _setAsWallpaper,
+                      child: const Text('Set as wallpaper'),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
