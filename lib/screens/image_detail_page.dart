@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'; // For Material/SnackBar
-import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:gallery_saver_plus/gallery_saver.dart';
@@ -29,9 +28,19 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
     }
   }
 
-  void _showMessage(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
+  Future<void> _showMessage(String msg) async {
+    await showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text('Notice'),
+        content: Text(msg),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -63,18 +72,27 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
   }
 
   Future<void> _setAsWallpaper() async {
+    if (_isProcessing) return;
     setState(() => _isProcessing = true);
     await _ensurePermissions();
     try {
+      // Get the file from the cache manager
       final file =
           await DefaultCacheManager().getSingleFile(widget.wallpaper.url);
-      final result = await wallpaperMgr.setWallpaper(
-        file.path,
-        WallpaperManagerPlus.homeScreen,
-      );
-      _showMessage(result ?? 'Wallpaper set!');
+
+      // Check if the file exists
+      if (await file.exists()) {
+        // Set the wallpaper using the file path
+        final result = await wallpaperMgr.setWallpaper(
+          file, // This should be a String path
+          WallpaperManagerPlus.homeScreen,
+        );
+        await _showMessage(result ?? 'Wallpaper set successfully!');
+      } else {
+        await _showMessage('File does not exist.');
+      }
     } catch (e) {
-      _showMessage('Set wallpaper failed: $e');
+      await _showMessage('Failed to set wallpaper: $e');
     } finally {
       setState(() => _isProcessing = false);
     }
