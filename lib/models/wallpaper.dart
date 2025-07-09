@@ -14,7 +14,7 @@ class Wallpaper {
   factory Wallpaper.fromJson(Map<String, dynamic> json) {
     return Wallpaper(
       id: json['id'].toString(), // int → String
-      url: json['webformatURL'] as String, // correct Pixabay key
+      url: json['largeImageURL'] as String, // correct Pixabay key
       photographer: json['user'] as String, // correct Pixabay key
     );
   }

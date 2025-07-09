@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Cupertino Wallpapers'),
+        middle: const Text('Qayham Wallpapers'),
       ),
       child: SafeArea(
         child: Column(
