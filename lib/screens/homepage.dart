@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:wallpaper/api/apiservice.dart';
 import 'package:wallpaper/models/wallpaper.dart';
+import 'package:wallpaper/screens/apipage.dart';
 import 'package:wallpaper/screens/image_detail_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -56,7 +57,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
+        leading: Icon(CupertinoIcons.add),
         middle: const Text('Qayham Wallpapers'),
+        trailing: CupertinoButton(
+          onPressed: () => Navigator.push(
+              context, CupertinoPageRoute(builder: (context) => ApiPage())),
+          child: Icon(
+            CupertinoIcons.app_fill,
+            size: 28.0,
+          ),
+        ),
       ),
       child: SafeArea(
         child: Column(
